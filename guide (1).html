@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>謎解きガイド</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;600;700&family=Shippori+Mincho:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0e0c;
+    --surface: #1c1a16;
+    --surface2: #252319;
+    --accent: #c8a96e;
+    --accent2: #e8c88a;
+    --text: #f0ece4;
+    --text-muted: #8a8068;
+    --border: rgba(200,169,110,0.2);
+    --hint-color: #6eafc8;
+    --hint-bg: rgba(110,175,200,0.08);
+    --hint-border: rgba(110,175,200,0.25);
+    --answer-color: #7ec87e;
+    --answer-bg: rgba(126,200,126,0.08);
+    --answer-border: rgba(126,200,126,0.25);
+    --radius: 16px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100dvh;
+    overflow: hidden;
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 40% at 80% 10%, rgba(200,169,110,0.07) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 50% at 20% 90%, rgba(100,80,40,0.1) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ─── SCREENS ─── */
+  .screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.45s cubic-bezier(0.4,0,0.2,1), opacity 0.45s ease;
+    z-index: 1;
+    overflow: hidden;
+  }
+  .screen.hidden { transform: translateX(100%); opacity: 0; pointer-events: none; }
+  .screen.slide-out { transform: translateX(-8%) scale(0.96); opacity: 0; pointer-events: none; }
+
+  /* ─── HOME ─── */
+  #home {
+    padding-top: calc(var(--safe-top) + 16px);
+    padding-bottom: calc(var(--safe-bottom) + 16px);
+  }
+
+  .home-header { padding: 28px 24px 20px; }
+  .home-header .label {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .home-header h1 {
+    font-family: 'Shippori Mincho', serif;
+    font-size: 28px; font-weight: 600;
+    line-height: 1.3; color: var(--text);
+  }
+  .home-header .sub { margin-top: 6px; font-size: 13px; color: var(--text-muted); }
+
+  .divider {
+    width: 40px; height: 1px;
+    background: linear-gradient(to right, var(--accent), transparent);
+    margin: 16px 24px;
+  }
+
+  .page-grid {
+    padding: 0 16px 16px;
+    overflow-y: auto; flex: 1;
+    -webkit-overflow-scrolling: touch;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .page-grid::-webkit-scrollbar { display: none; }
+
+  .page-btn {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.15s, border-color 0.2s;
+    text-align: left; width: 100%;
+    position: relative; overflow: hidden;
+  }
+  .page-btn::before {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: var(--accent); opacity: 0;
+    transition: opacity 0.2s; border-radius: 2px;
+  }
+  .page-btn:active { background: var(--surface2); transform: scale(0.98); border-color: var(--accent); }
+  .page-btn:active::before { opacity: 1; }
+
+  .btn-icon {
+    font-size: 22px; width: 44px; height: 44px;
+    background: var(--surface2); border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; border: 1px solid var(--border);
+  }
+  .btn-text { flex: 1; }
+  .btn-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+  .btn-desc { font-size: 12px; color: var(--text-muted); }
+  .btn-arrow { font-size: 16px; color: var(--accent); opacity: 0.6; }
+
+  /* ─── PAGE VIEW ─── */
+  .page-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: calc(var(--safe-top) + 14px) 16px 14px;
+    background: rgba(15,14,12,0.92);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .back-btn {
+    display: flex; align-items: center; gap: 4px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; padding: 7px 14px;
+    color: var(--accent); font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: background 0.2s;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .back-btn:active { background: var(--surface2); }
+
+  .page-header-title {
+    font-size: 15px; font-weight: 700; color: var(--text);
+    flex: 1; text-align: center;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .page-header-num {
+    font-size: 12px; color: var(--text-muted);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; padding: 5px 12px; flex-shrink: 0;
+  }
+
+  .progress-bar { height: 2px; background: var(--surface2); flex-shrink: 0; }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(to right, var(--accent), var(--accent2));
+    transition: width 0.4s ease;
+  }
+
+  .page-content {
+    flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: 20px 18px;
+    padding-bottom: calc(var(--safe-bottom) + 24px);
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .page-content::-webkit-scrollbar { display: none; }
+
+  /* ─── 問題カード ─── */
+  .puzzle-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    animation: fadeUp 0.3s ease both;
+  }
+  .puzzle-card-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .puzzle-num {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
+    color: var(--accent);
+    background: rgba(200,169,110,0.12);
+    border: 1px solid var(--border);
+    border-radius: 6px; padding: 3px 9px; flex-shrink: 0;
+  }
+  .puzzle-title-text {
+    font-family: 'Shippori Mincho', serif;
+    font-size: 16px; font-weight: 600; color: var(--text);
+  }
+  .puzzle-body { padding: 16px; }
+  .puzzle-desc {
+    font-size: 14px; line-height: 1.9;
+    color: rgba(240,236,228,0.85); margin-bottom: 14px;
+  }
+  .puzzle-desc:last-child { margin-bottom: 0; }
+  .puzzle-img {
+    width: 100%; border-radius: 10px; object-fit: cover;
+    border: 1px solid var(--border); display: block;
+    background: var(--surface2); min-height: 140px;
+  }
+
+  /* ─── アコーディオン ─── */
+  .accordion {
+    border-radius: var(--radius);
+    overflow: hidden; border: 1px solid;
+  }
+  .accordion.hint  {
+    border-color: var(--hint-border);
+    animation: fadeUp 0.3s 0.08s ease both;
+  }
+  .accordion.answer {
+    border-color: var(--answer-border);
+    animation: fadeUp 0.3s 0.16s ease both;
+  }
+
+  .accordion-trigger {
+    width: 100%; display: flex; align-items: center; gap: 12px;
+    padding: 16px 18px;
+    cursor: pointer; border: none; text-align: left;
+    transition: background 0.18s;
+  }
+  .hint   .accordion-trigger { background: var(--hint-bg); }
+  .answer .accordion-trigger { background: var(--answer-bg); }
+  .hint   .accordion-trigger:active { background: rgba(110,175,200,0.15); }
+  .answer .accordion-trigger:active { background: rgba(126,200,126,0.15); }
+
+  .accordion-icon-wrap {
+    width: 38px; height: 38px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex-shrink: 0;
+  }
+  .hint   .accordion-icon-wrap { background: rgba(110,175,200,0.15); }
+  .answer .accordion-icon-wrap { background: rgba(126,200,126,0.15); }
+
+  .accordion-label-wrap { flex: 1; }
+  .accordion-label {
+    font-size: 15px; font-weight: 700; display: block; margin-bottom: 1px;
+  }
+  .hint   .accordion-label { color: var(--hint-color); }
+  .answer .accordion-label { color: var(--answer-color); }
+  .accordion-sublabel { font-size: 11px; color: var(--text-muted); }
+
+  .accordion-chevron {
+    font-size: 20px; color: var(--text-muted);
+    transition: transform 0.32s cubic-bezier(0.4,0,0.2,1);
+    flex-shrink: 0; line-height: 1; user-select: none;
+  }
+  .accordion.open .accordion-chevron { transform: rotate(180deg); }
+
+  /* 本体スライド */
+  .accordion-body {
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.38s cubic-bezier(0.4,0,0.2,1);
+  }
+  .accordion.open .accordion-body { max-height: 1400px; }
+
+  .accordion-inner {
+    padding: 0 18px 18px;
+    font-size: 14px; line-height: 1.9;
+    color: rgba(240,236,228,0.88);
+  }
+  .accordion-sep {
+    height: 1px; margin-bottom: 14px;
+  }
+  .hint   .accordion-sep { background: var(--hint-border); }
+  .answer .accordion-sep { background: var(--answer-border); }
+
+  .accordion-inner img {
+    width: 100%; border-radius: 10px;
+    border: 1px solid var(--border); display: block; margin-top: 12px;
+    background: var(--surface2);
+  }
+
+  /* ─── ナビ ─── */
+  .page-nav {
+    display: flex; gap: 10px;
+    padding: 12px 20px; padding-bottom: calc(var(--safe-bottom) + 12px);
+    border-top: 1px solid var(--border);
+    background: rgba(15,14,12,0.92);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    flex-shrink: 0;
+  }
+  .nav-btn {
+    flex: 1; padding: 12px; border-radius: 10px;
+    font-size: 14px; font-weight: 700;
+    cursor: pointer; border: none;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .nav-btn.prev { background: var(--surface); border: 1px solid var(--border); color: var(--text-muted); }
+  .nav-btn.next { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: var(--bg); }
+  .nav-btn:disabled { opacity: 0.28; pointer-events: none; }
+  .nav-btn:active { transform: scale(0.97); }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ホーム画面 -->
+<div id="home" class="screen">
+  <div class="home-header">
+    <div class="label">MYSTERY GUIDE</div>
+    <h1>謎解き<br>ヒント＆回答</h1>
+    <div class="sub">ページを選んでヒントや答えを確認できます</div>
+  </div>
+  <div class="divider"></div>
+  <div class="page-grid" id="pageGrid"></div>
+</div>
+
+<!-- ページビュー -->
+<div id="page-view" class="screen hidden">
+  <div class="page-header">
+    <button class="back-btn" onclick="goHome()">← 一覧</button>
+    <div class="page-header-title" id="pageHeaderTitle"></div>
+    <div class="page-header-num" id="pageHeaderNum"></div>
+  </div>
+  <div class="progress-bar">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+  <div class="page-content" id="pageContent"></div>
+  <div class="page-nav">
+    <button class="nav-btn prev" id="prevBtn" onclick="changePage(-1)">← 前の謎</button>
+    <button class="nav-btn next" id="nextBtn" onclick="changePage(1)">次の謎 →</button>
+  </div>
+</div>
+
+<script>
+// =====================================================
+// ★★★ ここを編集してページを追加・変更できます ★★★
+//
+// 各ページの構成：
+//   title   … ページタイトル（ホーム一覧＆ヘッダーに表示）
+//   icon    … 絵文字アイコン
+//   desc    … ホーム一覧のサブテキスト
+//   question… 問題文（常に表示、HTMLが書けます）
+//             画像を入れる: <img class="puzzle-img" src="画像URL" alt="説明">
+//   hint    … ヒント（クリックで開閉、HTMLが書けます）
+//   answer  … 答え（クリックで開閉、HTMLが書けます）
+//
+// ページの追加: {} のブロックをカンマ区切りで追加するだけ
+// ページの削除: 対応する {} ブロックを消すだけ
+// =====================================================
+const PAGES = [
+  {
+    title: "謎①",
+    icon: "🔐",
+    desc: "最初の謎",
+    question: `
+      <p class="puzzle-desc">
+        □の場所へ行け
+      </p>
+    `,
+    hint: `
+      謎解き冊子の”町屋マップ”の中に散らばっている<br>
+      5つの漢字をそれぞれ当てはめてみよう！<br><br>
+      暗号の中にある記号に注目してみよう。
+    `,
+    answer: `
+      答えは『空』です。<br><br>
+     <img class="puzzle-img" src="https://drive.google.com/uc?export=view&id=1jRCDg3_oVxq32cGskKxVcPI2PuW9JYV5" alt="説明">
+
+    `
+  },
+  {
+    title: "謎②",
+    icon: "🕰️",
+    desc: "七福神の謎",
+    question: `
+      <p class="puzzle-desc">
+        七福神に関係しない国を探せ。
+      </p>
+      <img class="puzzle-img" src="https://images.unsplash.com/photo-1508057198894-247b23fe5ade?w=800&q=80" alt="時計">
+    `,
+    hint: `
+      ”謎2”のページの下の豆知識をよく読んでみよう！<br>
+    <br><br>
+    `,
+    answer: `
+      答えは『ブラジル』です
+    `
+  },
+  {
+    title: "謎③",
+    icon: "🖼️",
+    desc: "看板の謎",
+    question: `
+      <p class="puzzle-desc">
+        町屋エリアの3か所にある看板を見つけ
+        そこに書かれた文をよく読み、丸に入る文字を探して
+        ひらがなで埋めよ。
+      </p>
+    `,
+    hint: `
+      「町屋マップ」に看板の場所が載っているよ！<br>
+　　　　それぞれの看板をよく読んでみよう！<br>
+　　　　②と③はそれぞれ神様ごとの文章から。<br>
+　　　　①は、どの看板を確認しても答えが分かるよ！<br><br>。
+    `,
+    answer: `
+      答えは『いえす』
+    `
+  },
+  {
+    title: "謎④",
+    icon: "⭐",
+    desc: "天井ホールの謎",
+    question: `
+      <p class="puzzle-desc">
+        天井ホールに描かれた星座の地図。
+        3つの星座を結んだ線が交差する点に
+        隠された数字を見つけよ。
+      </p>
+      <img class="puzzle-img" src="https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=800&q=80" alt="星座">
+    `,
+    hint: `
+      地図の上に透明なシートを当てて、
+      3本の線を引いてみよう（スタッフに聞いてOK）。<br><br>
+      交差点の座標（縦軸×横軸）を読み取ろう。
+    `,
+    answer: `
+      答えは <strong style="color:var(--answer-color);font-size:18px;">「739」</strong> です。<br><br>
+      縦軸=7、横軸=3、そして深さ=9。<br>
+      この3桁の数字を南側の小扉に入力してください。
+    `
+  },
+  {
+    title: "謎⑤　最後の謎",
+    icon: "🏆",
+    desc: "クライマックス",
+    question: `
+      <p class="puzzle-desc">
+        これまで解いてきた4つの謎の答えを
+        すべて使って、最後のコードを導き出せ。<br><br>
+        「全ての答えの合計の下2桁」が
+        最後の扉を開ける鍵となる。
+      </p>
+    `,
+    hint: `
+      謎①〜④の答えの数字部分をすべて足してみよう。<br>
+      アルファベットは除外してOK。<br><br>
+      大きな数になるので、下2桁（10の位と1の位）だけ使う。
+    `,
+    answer: `
+      答えは <strong style="color:var(--answer-color);font-size:18px;">「01」</strong> です。<br><br>
+      2847＋15＋739＝3601 → 下2桁は「01」。<br>
+      最後の扉のパネルに「01」と入力してください。<br><br>
+      🎉 おめでとうございます、謎解きクリアです！
+    `
+  }
+];
+// =====================================================
+
+let currentPage = 0;
+
+function buildHome() {
+  const grid = document.getElementById('pageGrid');
+  grid.innerHTML = '';
+  PAGES.forEach((p, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'page-btn';
+    btn.innerHTML = `
+      <div class="btn-icon">${p.icon}</div>
+      <div class="btn-text">
+        <div class="btn-title">${p.title}</div>
+        <div class="btn-desc">${p.desc}</div>
+      </div>
+      <div class="btn-arrow">›</div>
+    `;
+    btn.onclick = () => openPage(i);
+    grid.appendChild(btn);
+  });
+}
+
+function openPage(index) {
+  currentPage = index;
+  renderPage();
+  const home = document.getElementById('home');
+  const view = document.getElementById('page-view');
+  home.classList.add('slide-out');
+  setTimeout(() => {
+    view.classList.remove('hidden');
+    home.style.display = 'none';
+  }, 350);
+}
+
+function goHome() {
+  const home = document.getElementById('home');
+  const view = document.getElementById('page-view');
+  home.style.display = '';
+  setTimeout(() => home.classList.remove('slide-out'), 10);
+  view.classList.add('hidden');
+}
+
+function toggleAccordion(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
+function renderPage() {
+  const p = PAGES[currentPage];
+  document.getElementById('pageHeaderTitle').textContent = p.title;
+  document.getElementById('pageHeaderNum').textContent = `${currentPage + 1} / ${PAGES.length}`;
+  document.getElementById('progressFill').style.width = `${((currentPage + 1) / PAGES.length) * 100}%`;
+
+  const content = document.getElementById('pageContent');
+  content.innerHTML = `
+
+    <!-- 問題カード（常に表示） -->
+    <div class="puzzle-card">
+      <div class="puzzle-card-header">
+        <span class="puzzle-num">No.${currentPage + 1}</span>
+        <span class="puzzle-title-text">${p.title}</span>
+      </div>
+      <div class="puzzle-body">${p.question}</div>
+    </div>
+
+    <!-- ヒント（閉じた状態でスタート） -->
+    <div class="accordion hint" id="acc-hint">
+      <button class="accordion-trigger" onclick="toggleAccordion('acc-hint')">
+        <div class="accordion-icon-wrap">💡</div>
+        <div class="accordion-label-wrap">
+          <span class="accordion-label">ヒントを見る</span>
+          <span class="accordion-sublabel">タップして表示</span>
+        </div>
+        <span class="accordion-chevron">⌄</span>
+      </button>
+      <div class="accordion-body">
+        <div class="accordion-inner">
+          <div class="accordion-sep"></div>
+          ${p.hint}
+        </div>
+      </div>
+    </div>
+
+    <!-- 答え（閉じた状態でスタート） -->
+    <div class="accordion answer" id="acc-answer">
+      <button class="accordion-trigger" onclick="toggleAccordion('acc-answer')">
+        <div class="accordion-icon-wrap">✅</div>
+        <div class="accordion-label-wrap">
+          <span class="accordion-label">答えを見る</span>
+          <span class="accordion-sublabel">タップして表示</span>
+        </div>
+        <span class="accordion-chevron">⌄</span>
+      </button>
+      <div class="accordion-body">
+        <div class="accordion-inner">
+          <div class="accordion-sep"></div>
+          ${p.answer}
+        </div>
+      </div>
+    </div>
+
+  `;
+  content.scrollTop = 0;
+
+  document.getElementById('prevBtn').disabled = currentPage === 0;
+  const nextBtn = document.getElementById('nextBtn');
+  if (currentPage === PAGES.length - 1) {
+    nextBtn.innerHTML = '✓ 完了';
+    nextBtn.disabled = true;
+  } else {
+    nextBtn.innerHTML = '次の謎 →';
+    nextBtn.disabled = false;
+  }
+}
+
+function changePage(dir) {
+  const next = currentPage + dir;
+  if (next < 0 || next >= PAGES.length) return;
+  currentPage = next;
+  renderPage();
+}
+
+buildHome();
+</script>
+</body>
+</html>
